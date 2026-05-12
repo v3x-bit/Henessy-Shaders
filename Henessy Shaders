@@ -1,0 +1,454 @@
+-- // WHITELIST SYSTEM //
+local WHITELISTED_IDS = {
+	3591795724,-- Replace with your ID
+ 10913610349,
+}
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local function IsWhitelisted(id)
+	for _, v in pairs(WHITELISTED_IDS) do if v == id then return true end end
+	return false
+end
+
+if not IsWhitelisted(LocalPlayer.UserId) then
+	LocalPlayer:Kick("Unauthorized: You are not whitelisted for Henessy Shaders.")
+	return
+end
+
+-- // CLEANUP (Prevents Multiplied Menus) //
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local OldGui = PlayerGui:FindFirstChild("HenessyGui")
+if OldGui then OldGui:Destroy() end
+local OldNotif = PlayerGui:FindFirstChild("HenessyNotif")
+if OldNotif then OldNotif:Destroy() end
+
+-- HENESSY SHADERS: ELITE ULTRA EDITION (FULL 105+)
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local Camera = workspace.CurrentCamera
+
+-- // CONFIG //
+local ToggleKey = Enum.KeyCode.Insert
+local IsBinding = false
+local Favorites = {}
+local FavFile = "Henessy_Favorites.json"
+local MenuSize = UDim2.new(0, 800, 0, 720) 
+local IsMenuOpen = false
+local OpenSoundId = "rbxassetid://6042048331" 
+local HasPlayedSound = false 
+
+-- Variables for Special Shaders
+local LiquidPart = nil
+local LiquidConn = nil
+
+-- // PERSISTENCE //
+local function SaveFavorites() if writefile then writefile(FavFile, HttpService:JSONEncode(Favorites)) end end
+local function LoadFavorites()
+	if isfile and isfile(FavFile) then
+		local success, data = pcall(function() return HttpService:JSONDecode(readfile(FavFile)) end)
+		if success then Favorites = data end
+	end
+end
+LoadFavorites()
+
+-- // THEME //
+local THEME = {
+	Background = Color3.fromRGB(12, 12, 14),
+	Secondary = Color3.fromRGB(18, 18, 22),
+	Accent = Color3.fromRGB(194, 255, 26), 
+	TextPrimary = Color3.fromRGB(255, 255, 255),
+	TextSecondary = Color3.fromRGB(160, 160, 165),
+	Font = Enum.Font.BuilderSansMedium,
+	FontBold = Enum.Font.BuilderSansBold,
+}
+
+local function create(class, props)
+	local i = Instance.new(class)
+	for k,v in pairs(props) do i[k] = v end
+	return i
+end
+
+-- // UI SETUP //
+local TargetParent = (gethui and gethui()) or game:GetService("CoreGui") or PlayerGui
+
+local ScreenGui = create("ScreenGui", {
+    Name = "HenessyGui", 
+    Parent = TargetParent, 
+    ResetOnSpawn = false, 
+    ZIndexBehavior = Enum.ZIndexBehavior.Global,
+    DisplayOrder = 2147483647,
+    IgnoreGuiInset = true
+})
+
+local NotifGui = create("ScreenGui", {
+    Name = "HenessyNotif", 
+    Parent = TargetParent, 
+    ResetOnSpawn = false,
+    DisplayOrder = 2147483647,
+    IgnoreGuiInset = true
+})
+
+local Main = create("Frame", {Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0), BackgroundColor3 = THEME.Background, Parent = ScreenGui, ClipsDescendants = true, Visible = false, ZIndex = 10})
+local Corner = create("UICorner", {CornerRadius = UDim.new(1, 0), Parent = Main})
+create("UIStroke", {Color = Color3.fromRGB(45,45,50), Thickness = 1.5, Parent = Main})
+
+local OpenSound = create("Sound", {SoundId = OpenSoundId, Volume = 0.5, Parent = Main})
+local Content = create("Frame", {Size = MenuSize, BackgroundTransparency = 1, Parent = Main, Visible = true, ZIndex = 11})
+
+-- // NOTIFICATION SYSTEM //
+local function Notify(text)
+	local N = create("Frame", {Size = UDim2.new(0, 280, 0, 60), Position = UDim2.new(0, -320, 0, 30), BackgroundColor3 = THEME.Background, Parent = NotifGui, ZIndex = 100})
+	create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = N})
+	create("UIStroke", {Color = THEME.Accent, Thickness = 1.5, Parent = N})
+	create("TextLabel", {Text = text, Size = UDim2.new(1, -20, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, TextColor3 = THEME.TextPrimary, Font = THEME.FontBold, TextSize = 14, TextXAlignment = "Left", Parent = N, ZIndex = 101})
+	
+	TweenService:Create(N, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = UDim2.new(0, 20, 0, 30)}):Play()
+	task.delay(4, function()
+		if not N or not N.Parent then return end
+		local out = TweenService:Create(N, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {Position = UDim2.new(0, -320, 0, 30)})
+		out:Play() out.Completed:Connect(function() N:Destroy() end)
+	end)
+end
+
+-- // HEADER //
+local Header = create("Frame", {Size = UDim2.new(1, 0, 0, 50), BackgroundColor3 = Color3.fromRGB(8,8,10), Parent = Content, ZIndex = 12})
+create("UICorner", {Parent = Header})
+
+-- ANIMATED TITLE
+local Title = create("TextLabel", {
+    Text = "HENESSY  SHADERS", 
+    Position = UDim2.new(0, 20, 0, 0), 
+    Size = UDim2.new(0, 200, 1, 0), 
+    TextColor3 = THEME.TextPrimary, 
+    Font = THEME.FontBold, 
+    TextSize = 15, 
+    BackgroundTransparency = 1, 
+    TextXAlignment = "Left", 
+    Parent = Header, 
+    ZIndex = 13
+})
+
+-- Title Animation Loop
+task.spawn(function()
+    local counter = 0
+    while task.wait() do
+        counter = counter + 0.02
+        local color = Color3.fromHSV(math.abs(math.sin(counter * 0.5)), 0.6, 1)
+        Title.TextColor3 = THEME.TextPrimary:Lerp(color, 0.5 + math.sin(counter) * 0.5)
+    end
+end)
+
+local CloseBtn = create("TextButton", {Text = "×", Position = UDim2.new(1, -45, 0, 0), Size = UDim2.new(0, 45, 1, 0), TextColor3 = THEME.TextSecondary, Font = Enum.Font.Arial, TextSize = 24, BackgroundTransparency = 1, Parent = Header, ZIndex = 13})
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() NotifGui:Destroy() end)
+
+local KeybindContainer = create("Frame", {Size = UDim2.new(0, 80, 0, 26), Position = UDim2.new(1, -130, 0.5, -13), BackgroundColor3 = THEME.Secondary, Parent = Header, ZIndex = 13})
+create("UICorner", {CornerRadius = UDim.new(0, 4), Parent = KeybindContainer})
+local KeybindBtn = create("TextButton", {Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = ToggleKey.Name, TextColor3 = THEME.Accent, Font = THEME.FontBold, TextSize = 12, Parent = KeybindContainer, ZIndex = 14})
+
+-- // SHADER INFO //
+local SelFrame = create("Frame", {Size = UDim2.new(1, -40, 0, 80), Position = UDim2.new(0, 20, 0, 130), BackgroundTransparency = 1, Parent = Content, ZIndex = 12})
+local SelTitle = create("TextLabel", {Text = "Select Shader", Size = UDim2.new(1, 0, 0, 40), TextColor3 = THEME.TextPrimary, Font = THEME.FontBold, TextSize = 34, BackgroundTransparency = 1, TextXAlignment = "Left", Parent = SelFrame, ZIndex = 13})
+local SelDesc = create("TextLabel", {Text = "Pick a preset below to enhance your game.", Position = UDim2.new(0, 0, 0, 45), Size = UDim2.new(1, 0, 0, 20), TextColor3 = THEME.TextSecondary, Font = THEME.Font, TextSize = 14, BackgroundTransparency = 1, TextXAlignment = "Left", Parent = SelFrame, ZIndex = 13})
+
+-- // NAVIGATION //
+local SearchContainer = create("Frame", {Size = UDim2.new(1, -40, 0, 35), Position = UDim2.new(0, 20, 0, 65), BackgroundColor3 = THEME.Secondary, Parent = Content, ZIndex = 12})
+create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = SearchContainer})
+local SearchInput = create("TextBox", {PlaceholderText = "Search 105+ shaders...", Text = "", Size = UDim2.new(1, -30, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, TextColor3 = THEME.TextPrimary, PlaceholderColor3 = THEME.TextSecondary, Font = THEME.Font, TextSize = 14, TextXAlignment = "Left", Parent = SearchContainer, ZIndex = 13})
+
+local TabBar = create("Frame", {Size = UDim2.new(1, -40, 0, 35), Position = UDim2.new(0, 20, 0, 220), BackgroundTransparency = 1, Parent = Content, ZIndex = 12})
+create("UIListLayout", {FillDirection = "Horizontal", Padding = UDim.new(0, 8), Parent = TabBar})
+
+local Scroll = create("ScrollingFrame", {Size = UDim2.new(1, -40, 1, -290), Position = UDim2.new(0, 20, 0, 270), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 4, ScrollBarImageColor3 = THEME.Secondary, Parent = Content, ZIndex = 12})
+local ListLayout = create("UIListLayout", {Padding = UDim.new(0, 8), Parent = Scroll})
+
+-- // THE COMPLETE 105+ SHADER LIBRARY //
+local SHADER_TABS = {
+	["FAVORITES"] = {},
+    ["RIVALS"] = {
+		{Name = "Dark & Glow", Desc = "Rivals style: Deep blacks and neon glowing highlights.", Set = {Type = "Special", Mode = "DarkGlow"}},
+		{Name = "Liquid Shader", Desc = "Makes the entire game look like moving liquid/glass.", Set = {Type = "Special", Mode = "Liquid"}},
+        {Name = "Rivals High", Desc = "Ultra contrast for competitive Rivals play.", Set = {Time = 12, Bright = 3.5, Sat = 0.4, Con = 0.5, Bloom = 0.4, Color = Color3.fromRGB(255,255,255)}},
+	},
+	["BRIGHT / CLEAN"] = {
+		{Name = "Clarity", Desc = "Cool clarity with restrained bloom.", Set = {Time = 12, Bright = 2.5, Sat = 0, Con = 0.1, Bloom = 0.15, Color = Color3.fromRGB(235, 245, 255)}},
+		{Name = "Realism", Desc = "Warmer natural daylight with softer grading.", Set = {Time = 14, Bright = 2.2, Sat = 0.05, Con = 0.05, Bloom = 0.3, Color = Color3.fromRGB(255, 250, 235)}},
+		{Name = "Ultra Realism", Desc = "Deeper depth and high specular response.", Set = {Time = 11, Bright = 3.0, Sat = 0.1, Con = 0.2, Bloom = 0.2, Color = Color3.fromRGB(255, 255, 255)}},
+		{Name = "Clean", Desc = "Crisp mid-day balance with minimal haze.", Set = {Time = 12, Bright = 2.4, Sat = 0, Con = 0.1, Bloom = 0.1, Color = Color3.fromRGB(255, 255, 255)}},
+		{Name = "High Noon", Desc = "Maximum overhead intensity, zero shadows.", Set = {Time = 12, Bright = 4, Sat = 0.1, Con = 0.2, Bloom = 0.1, Color = Color3.fromRGB(255, 255, 255)}},
+		{Name = "Vibrant Life", Desc = "Pop colors and soft white highlights.", Set = {Time = 10, Bright = 2.8, Sat = 0.5, Con = 0.2, Bloom = 0.4, Color = Color3.fromRGB(240, 255, 240)}},
+		{Name = "Summer Day", Desc = "High saturation and bright blue sky tint.", Set = {Time = 14.5, Bright = 3.2, Sat = 0.4, Con = 0.1, Bloom = 0.5, Color = Color3.fromRGB(230, 245, 255)}},
+		{Name = "Studio Light", Desc = "Controlled environment style lighting.", Set = {Time = 12, Bright = 2.5, Sat = 0.1, Con = 0.3, Bloom = 0.2, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Neutral 4K", Desc = "Flat profile for high-detail recording.", Set = {Time = 12.5, Bright = 2, Sat = 0, Con = 0.05, Bloom = 0.1, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Crystal", Desc = "Cold, sharp, and highly reflective surfaces.", Set = {Time = 11, Bright = 3, Sat = -0.1, Con = 0.4, Bloom = 0.05, Color = Color3.fromRGB(220,240,255)}},
+		{Name = "Direct Sun", Desc = "Heavy contrast with harsh white light.", Set = {Time = 12, Bright = 5, Sat = 0.1, Con = 0.5, Bloom = 0.1, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Soft Day", Desc = "Gentle diffusion with low specularity.", Set = {Time = 10, Bright = 2.2, Sat = 0.2, Con = -0.1, Bloom = 0.6, Color = Color3.fromRGB(255,250,240)}},
+		{Name = "Modern White", Desc = "Clean architectural lighting style.", Set = {Time = 12, Bright = 3, Sat = -0.1, Con = 0.2, Bloom = 0.2, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Noon Breeze", Desc = "Slight blue tint and light wind feel.", Set = {Time = 12.5, Bright = 2.4, Sat = 0.1, Con = 0.1, Bloom = 0.2, Color = Color3.fromRGB(240,250,255)}},
+		{Name = "Balanced Tone", Desc = "Optimal colors for all environments.", Set = {Time = 13, Bright = 2.3, Sat = 0.15, Con = 0.15, Bloom = 0.3, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Spring Sun", Desc = "Warm and vibrant morning light.", Set = {Time = 9, Bright = 2.8, Sat = 0.4, Con = 0.1, Bloom = 0.5, Color = Color3.fromRGB(255,255,220)}},
+		{Name = "High Exposure", Desc = "Blown out highlights for a dream look.", Set = {Time = 12, Bright = 3.5, Sat = 0.2, Con = 0.3, Bloom = 1.5, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Pure Clean", Desc = "Strictly neutral, zero color bleeding.", Set = {Time = 12, Bright = 2.5, Sat = 0, Con = 0, Bloom = 0, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Daylight 6000K", Desc = "Standard professional color temperature.", Set = {Time = 12, Bright = 2.6, Sat = 0.05, Con = 0.1, Bloom = 0.2, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Bright Shore", Desc = "Ideal for water and beach scenes.", Set = {Time = 11.5, Bright = 3.2, Sat = 0.3, Con = 0.2, Bloom = 0.8, Color = Color3.fromRGB(220,245,255)}},
+		{Name = "Overhead Focus", Desc = "High intensity focus on player.", Set = {Time = 12, Bright = 4, Sat = 0.1, Con = 0.4, Bloom = 0.2, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Vivid Day", Desc = "High saturation, low contrast colors.", Set = {Time = 13, Bright = 2.4, Sat = 0.6, Con = -0.1, Bloom = 0.4, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Sharp Shadows", Desc = "Deep shadows and bright highlights.", Set = {Time = 15, Bright = 3.5, Sat = 0.2, Con = 0.6, Bloom = 0.3, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Arctic Bright", Desc = "Blindingly clean white light.", Set = {Time = 12, Bright = 4.5, Sat = -0.3, Con = 0.3, Bloom = 1.0, Color = Color3.fromRGB(240,250,255)}},
+		{Name = "Vibrant Bloom", Desc = "High-energy colors with edge glow.", Set = {Time = 11, Bright = 3, Sat = 0.6, Con = 0.2, Bloom = 2, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Pure Light", Desc = "Zero shadow, maximum visibility.", Set = {Time = 12, Bright = 5, Sat = 0, Con = -0.2, Bloom = 0.1, Color = Color3.fromRGB(255,255,255)}},
+	},
+	["GOLDEN / CINEMATIC"] = {
+		{Name = "Cinematic", Desc = "Film-like contrast and deeper sunset glow.", Set = {Time = 17.8, Bright = 2.8, Sat = 0.2, Con = 0.4, Bloom = 1.1, Color = Color3.fromRGB(255, 200, 150)}},
+		{Name = "Golden Hour", Desc = "Soft amber highlight rolloff.", Set = {Time = 17.2, Bright = 3.5, Sat = 0.3, Con = 0.15, Bloom = 1.8, Color = Color3.fromRGB(255, 180, 100)}},
+		{Name = "Pink Sunset", Desc = "Rosier dusk tint with thicker glow.", Set = {Time = 18.2, Bright = 2.5, Sat = 0.4, Con = 0.2, Bloom = 2.2, Color = Color3.fromRGB(255, 150, 200)}},
+		{Name = "Hollywood", Desc = "High contrast, teal/orange color grade.", Set = {Time = 16, Bright = 3, Sat = 0.2, Con = 0.5, Bloom = 0.6, Color = Color3.fromRGB(200, 220, 255)}},
+		{Name = "Vintage Film", Desc = "Sepia undertones and heavy grain style.", Set = {Time = 15, Bright = 2, Sat = -0.2, Con = 0.3, Bloom = 0.5, Color = Color3.fromRGB(255, 230, 180)}},
+		{Name = "Sunset Blaze", Desc = "Intense orange sky with long shadows.", Set = {Time = 18, Bright = 4, Sat = 0.6, Con = 0.4, Bloom = 3, Color = Color3.fromRGB(255, 140, 50)}},
+		{Name = "Afterglow", Desc = "The purple/blue moment after the sun sets.", Set = {Time = 18.8, Bright = 1.5, Sat = 0.3, Con = 0.2, Bloom = 0.8, Color = Color3.fromRGB(150, 100, 255)}},
+		{Name = "Noir 1940", Desc = "Classic black and white detective look.", Set = {Time = 18, Bright = 2, Sat = -1, Con = 0.7, Bloom = 0.1, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Retro 80s", Desc = "Neon pink and synthwave aesthetics.", Set = {Time = 19, Bright = 2.5, Sat = 0.8, Con = 0.3, Bloom = 4, Color = Color3.fromRGB(255, 50, 255)}},
+		{Name = "Amber Dusk", Desc = "Smooth, low-intensity warm evening.", Set = {Time = 17.5, Bright = 1.8, Sat = 0.2, Con = 0.1, Bloom = 0.5, Color = Color3.fromRGB(255,180,120)}},
+		{Name = "Technicolor", Desc = "Hyper-saturated vintage movie look.", Set = {Time = 14, Bright = 3, Sat = 1, Con = 0.4, Bloom = 0.8, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Deep Cinematic", Desc = "Maximum depth of field and shadow detail.", Set = {Time = 16.5, Bright = 2.2, Sat = 0.1, Con = 0.5, Bloom = 0.4, Color = Color3.fromRGB(200,200,220)}},
+		{Name = "Golden Mist", Desc = "Morning sun hitting heavy moisture.", Set = {Time = 7.2, Bright = 3, Sat = 0.3, Con = 0.2, Bloom = 2, Color = Color3.fromRGB(255,220,150)}},
+		{Name = "Film Noir Blue", Desc = "Cold, high-contrast night detective look.", Set = {Time = 0, Bright = 1.5, Sat = -0.8, Con = 0.6, Bloom = 0.2, Color = Color3.fromRGB(150,180,255)}},
+		{Name = "Romantic Dusk", Desc = "Soft purple and orange gradient.", Set = {Time = 18.3, Bright = 2.2, Sat = 0.5, Con = 0.1, Bloom = 1.5, Color = Color3.fromRGB(255,150,255)}},
+		{Name = "Western Sand", Desc = "Sepia grit for desert cinematic shots.", Set = {Time = 16, Bright = 3, Sat = 0.1, Con = 0.4, Bloom = 0.5, Color = Color3.fromRGB(255,200,150)}},
+		{Name = "Blockbuster", Desc = "The iconic high-budget movie grading.", Set = {Time = 15.5, Bright = 2.8, Sat = 0.2, Con = 0.45, Bloom = 0.3, Color = Color3.fromRGB(210,230,255)}},
+		{Name = "Warm Memory", Desc = "Low contrast, high bloom, yellowish tint.", Set = {Time = 14, Bright = 2.5, Sat = -0.1, Con = -0.2, Bloom = 3, Color = Color3.fromRGB(255,240,200)}},
+		{Name = "Cyber Glow", Desc = "Extreme specular and neon highlights.", Set = {Time = 19.5, Bright = 1.8, Sat = 0.6, Con = 0.4, Bloom = 5, Color = Color3.fromRGB(180,255,255)}},
+		{Name = "Sunset Silhouette", Desc = "Sun directly behind for dark foregrounds.", Set = {Time = 18.1, Bright = 6, Sat = 0.4, Con = 0.8, Bloom = 10, Color = Color3.fromRGB(255,100,0)}},
+		{Name = "Vintage Polaroid", Desc = "Faded colors and washed out blacks.", Set = {Time = 14, Bright = 2, Sat = -0.3, Con = -0.1, Bloom = 0.8, Color = Color3.fromRGB(255,245,230)}},
+		{Name = "Deep Autumn", Desc = "Rich browns and oranges with long shadows.", Set = {Time = 16.8, Bright = 2.4, Sat = 0.5, Con = 0.3, Bloom = 0.6, Color = Color3.fromRGB(255,180,100)}},
+		{Name = "Cyberpunk Blue", Desc = "Deep teal sky and neon glow.", Set = {Time = 20, Bright = 2, Sat = 0.5, Con = 0.4, Bloom = 3.5, Color = Color3.fromRGB(50,255,255)}},
+		{Name = "Old Tape", Desc = "Washed out 70s home video aesthetic.", Set = {Time = 15, Bright = 1.8, Sat = -0.2, Con = -0.1, Bloom = 1.5, Color = Color3.fromRGB(255,250,200)}},
+		{Name = "Oscar Night", Desc = "High-end gala lighting style.", Set = {Time = 20, Bright = 2.5, Sat = 0.3, Con = 0.4, Bloom = 2, Color = Color3.fromRGB(255,220,180)}},
+		{Name = "Sundown Echo", Desc = "Fading light with long purple rays.", Set = {Time = 18.6, Bright = 2, Sat = 0.4, Con = 0.3, Bloom = 1.2, Color = Color3.fromRGB(200,100,255)}},
+	},
+	["DAYBREAK / SEASONAL"] = {
+		{Name = "Night", Desc = "Cleaner dark profile, no washed blue cast.", Set = {Time = 0, Bright = 1.2, Sat = -0.1, Con = 0.3, Bloom = 0.1, Color = Color3.fromRGB(150, 160, 200)}},
+		{Name = "Midnight Blue", Desc = "Deep navy sky with crystal stars.", Set = {Time = 0, Bright = 0.8, Sat = -0.3, Con = 0.5, Bloom = 0.05, Color = Color3.fromRGB(50, 60, 150)}},
+		{Name = "Winter Dawn", Desc = "Pale blue light and freezing haze.", Set = {Time = 6.2, Bright = 2.0, Sat = -0.2, Con = 0.2, Bloom = 0.4, Color = Color3.fromRGB(200, 230, 255)}},
+		{Name = "Arctic Morning", Desc = "Pure white horizon with cold shadows.", Set = {Time = 7, Bright = 2.5, Sat = -0.4, Con = 0.3, Bloom = 0.8, Color = Color3.fromRGB(240, 250, 255)}},
+		{Name = "Blood Moon", Desc = "Eerie red nocturnal lighting.", Set = {Time = 0, Bright = 1.5, Sat = 0.5, Con = 0.4, Bloom = 1.2, Color = Color3.fromRGB(255, 50, 50)}},
+		{Name = "Frozen Lake", Desc = "High reflections, blue tint, misty.", Set = {Time = 8, Bright = 2, Sat = -0.3, Con = 0.2, Bloom = 0.5, Color = Color3.fromRGB(180,230,255)}},
+		{Name = "Stormy Night", Desc = "Dark, high contrast, heavy atmosphere.", Set = {Time = 1, Bright = 1, Sat = -0.5, Con = 0.6, Bloom = 0.1, Color = Color3.fromRGB(100,100,120)}},
+		{Name = "Morning Dew", Desc = "Fresh, bright morning with light fog.", Set = {Time = 6.5, Bright = 2.5, Sat = 0.2, Con = 0.1, Bloom = 1, Color = Color3.fromRGB(220,255,230)}},
+		{Name = "Autumn Rise", Desc = "Crisp orange morning light.", Set = {Time = 7.5, Bright = 3, Sat = 0.4, Con = 0.2, Bloom = 0.8, Color = Color3.fromRGB(255,200,150)}},
+		{Name = "Lunar Base", Desc = "Zero atmosphere look, black sky.", Set = {Time = 0, Bright = 3, Sat = -1, Con = 1, Bloom = 0, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Blue Dawn", Desc = "Pre-sunrise deep blue light.", Set = {Time = 5.8, Bright = 1.5, Sat = 0.2, Con = 0.2, Bloom = 0.3, Color = Color3.fromRGB(100,150,255)}},
+		{Name = "Tropical Rain", Desc = "Overcast, wet surfaces, green tint.", Set = {Time = 13, Bright = 1.5, Sat = 0.3, Con = 0, Bloom = 0.5, Color = Color3.fromRGB(200,255,200)}},
+		{Name = "Deep Space", Desc = "Complete darkness with starry spec.", Set = {Time = 0, Bright = 0.5, Sat = -0.5, Con = 0.8, Bloom = 0.05, Color = Color3.fromRGB(20,20,50)}},
+		{Name = "Summer Noon", Desc = "Overpowering heat and bright light.", Set = {Time = 12, Bright = 4.5, Sat = 0.4, Con = 0.3, Bloom = 0.4, Color = Color3.fromRGB(255,255,200)}},
+		{Name = "Eclipse", Desc = "Surreal dark day lighting.", Set = {Time = 12, Bright = 1, Sat = -0.2, Con = 0.6, Bloom = 5, Color = Color3.fromRGB(150,150,180)}},
+		{Name = "Frosty Night", Desc = "Cold blue night with thick mist.", Set = {Time = 2, Bright = 1.2, Sat = -0.1, Con = 0.3, Bloom = 0.5, Color = Color3.fromRGB(180,210,255)}},
+		{Name = "Sahara Day", Desc = "Yellow/orange heat haze and brightness.", Set = {Time = 13, Bright = 3.5, Sat = 0.3, Con = 0.3, Bloom = 1, Color = Color3.fromRGB(255,220,150)}},
+		{Name = "Emerald Forest", Desc = "Soft green lighting and deep shadows.", Set = {Time = 11, Bright = 2, Sat = 0.5, Con = 0.2, Bloom = 0.4, Color = Color3.fromRGB(200,255,200)}},
+		{Name = "Spring Bloom", Desc = "Gentle pink tint and high visibility.", Set = {Time = 10, Bright = 2.4, Sat = 0.4, Con = 0.1, Bloom = 1.2, Color = Color3.fromRGB(255,220,240)}},
+		{Name = "Winter Solstice", Desc = "Low sun, long shadows, cold light.", Set = {Time = 15.5, Bright = 2, Sat = -0.2, Con = 0.3, Bloom = 0.2, Color = Color3.fromRGB(220,230,255)}},
+		{Name = "Neon Night", Desc = "Vibrant colors in a dark environment.", Set = {Time = 0, Bright = 2, Sat = 0.7, Con = 0.4, Bloom = 3, Color = Color3.fromRGB(255,100,255)}},
+		{Name = "Rainy Day", Desc = "Depressing grey, wet specular look.", Set = {Time = 12, Bright = 1.4, Sat = -0.3, Con = 0.1, Bloom = 0.2, Color = Color3.fromRGB(180,180,200)}},
+		{Name = "Morning Mist", Desc = "Low visibility orange morning.", Set = {Time = 6.8, Bright = 2.5, Sat = 0.3, Con = 0.2, Bloom = 1.5, Color = Color3.fromRGB(255,200,150)}},
+		{Name = "Dusk Chill", Desc = "Dark purple sky, cold shadows.", Set = {Time = 19, Bright = 1.5, Sat = 0.2, Con = 0.4, Bloom = 0.5, Color = Color3.fromRGB(100,100,200)}},
+		{Name = "Venusian Sky", Desc = "Thick orange/yellow atmosphere.", Set = {Time = 12, Bright = 2.5, Sat = 0.5, Con = 0.4, Bloom = 2, Color = Color3.fromRGB(255,200,50)}},
+		{Name = "Polaris", Desc = "Pure blue starlight and sharp frost.", Set = {Time = 22, Bright = 1.5, Sat = 0.2, Con = 0.5, Bloom = 0.4, Color = Color3.fromRGB(200,220,255)}},
+		{Name = "Aurora Borealis", Desc = "Ethereal green night-sky glow.", Set = {Time = 0, Bright = 2, Sat = 0.6, Con = 0.3, Bloom = 4, Color = Color3.fromRGB(150,255,200)}},
+	},
+	["ATMOSPHERIC / FOG"] = {
+		{Name = "Heavy Fog", Desc = "Much heavier haze, shorter scene depth.", Set = {Time = 10, Bright = 1.5, Sat = -0.2, Con = 0.1, Bloom = 0.2, Color = Color3.fromRGB(180, 180, 180)}},
+		{Name = "Silent Hill", Desc = "Eerie grey void with near-zero visibility.", Set = {Time = 14, Bright = 1.0, Sat = -0.5, Con = 0.2, Bloom = 0.1, Color = Color3.fromRGB(150, 150, 150)}},
+		{Name = "Toxic Haze", Desc = "Deep lime atmosphere for sci-fi scenes.", Set = {Time = 12, Bright = 2, Sat = 0.4, Con = 0.3, Bloom = 1.5, Color = Color3.fromRGB(180, 255, 150)}},
+		{Name = "Deep Void", Desc = "Total darkness with high-contrast lights.", Set = {Time = 0, Bright = 0, Sat = -1, Con = 1, Bloom = 0, Color = Color3.fromRGB(0,0,0)}},
+		{Name = "Mystic Purple", Desc = "Dream-like violet mist and soft glow.", Set = {Time = 18, Bright = 2, Sat = 0.3, Con = 0.2, Bloom = 2, Color = Color3.fromRGB(200, 150, 255)}},
+		{Name = "Radioactive", Desc = "Glowing green air and high contrast.", Set = {Time = 12, Bright = 3, Sat = 0.8, Con = 0.5, Bloom = 6, Color = Color3.fromRGB(100,255,100)}},
+		{Name = "Deep Sea", Desc = "Murky blue with heavy visibility limit.", Set = {Time = 12, Bright = 1.2, Sat = -0.2, Con = 0.3, Bloom = 0.5, Color = Color3.fromRGB(50,100,200)}},
+		{Name = "Haunted Woods", Desc = "Desaturated, dark, misty, and cold.", Set = {Time = 2, Bright = 1.5, Sat = -0.6, Con = 0.5, Bloom = 0.2, Color = Color3.fromRGB(150,150,150)}},
+		{Name = "Ash Fall", Desc = "Grey/dark orange apocalyptic lighting.", Set = {Time = 15, Bright = 1.8, Sat = -0.4, Con = 0.3, Bloom = 0.8, Color = Color3.fromRGB(100,80,60)}},
+		{Name = "Red Alert", Desc = "Intense flashing red atmosphere.", Set = {Time = 12, Bright = 4, Sat = 1, Con = 0.6, Bloom = 10, Color = Color3.fromRGB(255,0,0)}},
+		{Name = "Liminal Space", Desc = "Flat, uncomfortable fluorescent look.", Set = {Time = 12, Bright = 2.5, Sat = -0.1, Con = -0.2, Bloom = 0.1, Color = Color3.fromRGB(255,255,220)}},
+		{Name = "Cyberpunk Neon", Desc = "Wet roads, pink fog, cyan sky.", Set = {Time = 21, Bright = 2.2, Sat = 0.8, Con = 0.5, Bloom = 8, Color = Color3.fromRGB(255,50,255)}},
+		{Name = "White Out", Desc = "Pure white fog, zero depth.", Set = {Time = 12, Bright = 4, Sat = -1, Con = -0.5, Bloom = 2, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Volcanic", Desc = "Heat distortion and deep red glow.", Set = {Time = 12, Bright = 2.5, Sat = 0.6, Con = 0.4, Bloom = 3, Color = Color3.fromRGB(255,100,50)}},
+		{Name = "Ethereal", Desc = "Dreamy, bright, white and gold mist.", Set = {Time = 12, Bright = 3, Sat = 0.1, Con = -0.3, Bloom = 5, Color = Color3.fromRGB(255,255,200)}},
+		{Name = "Dense Smoke", Desc = "Dark grey, near zero visibility.", Set = {Time = 12, Bright = 1, Sat = -1, Con = 0.5, Bloom = 0, Color = Color3.fromRGB(50,50,50)}},
+		{Name = "Mars", Desc = "The red planet's dusty atmosphere.", Set = {Time = 10, Bright = 2.2, Sat = 0.4, Con = 0.3, Bloom = 0.5, Color = Color3.fromRGB(255,150,100)}},
+		{Name = "Swamp Gas", Desc = "Dirty green haze with low light.", Set = {Time = 16, Bright = 1.5, Sat = 0.2, Con = 0.1, Bloom = 1, Color = Color3.fromRGB(150,180,100)}},
+		{Name = "Outer Space", Desc = "Pitch black sky, harsh star light.", Set = {Time = 0, Bright = 5, Sat = -0.5, Con = 1, Bloom = 0.1, Color = Color3.fromRGB(255,255,255)}},
+		{Name = "Golden Cloud", Desc = "Like flying through a sunset.", Set = {Time = 17.5, Bright = 3, Sat = 0.5, Con = 0.2, Bloom = 4, Color = Color3.fromRGB(255,180,50)}},
+		{Name = "Abyssal", Desc = "Deep purple void, high contrast.", Set = {Time = 0, Bright = 0.5, Sat = 0.5, Con = 0.8, Bloom = 0.2, Color = Color3.fromRGB(100,50,255)}},
+		{Name = "Sandstorm Pro", Desc = "Extreme desert wind and dust.", Set = {Time = 11, Bright = 2.5, Sat = 0.3, Con = 0.4, Bloom = 0.5, Color = Color3.fromRGB(200,150,100)}},
+		{Name = "Glitch Space", Desc = "Inverted colors and surreal lighting.", Set = {Time = 12, Bright = 2.5, Sat = -2, Con = 2, Bloom = 10, Color = Color3.fromRGB(0,255,255)}},
+		{Name = "Dusty Trail", Desc = "Fine brown dust and low visibility.", Set = {Time = 14, Bright = 2, Sat = 0.1, Con = 0.2, Bloom = 0.5, Color = Color3.fromRGB(200,180,150)}},
+		{Name = "Void Echo", Desc = "Cold, dark, and empty atmosphere.", Set = {Time = 0, Bright = 0.5, Sat = -0.8, Con = 0.6, Bloom = 0.1, Color = Color3.fromRGB(50,50,80)}},
+		{Name = "Glow Valley", Desc = "Dense mist with high-intensity bloom.", Set = {Time = 12, Bright = 2.5, Sat = 0.2, Con = 0.1, Bloom = 15, Color = Color3.fromRGB(255,255,255)}},
+	}
+}
+
+-- // SHADER HANDLER //
+local function CleanSpecialShaders()
+    if LiquidConn then LiquidConn:Disconnect() LiquidConn = nil end
+    if LiquidPart then LiquidPart:Destroy() LiquidPart = nil end
+    if Lighting:FindFirstChild("RivalsGlow") then Lighting.RivalsGlow:Destroy() end
+end
+
+-- // RENDERER //
+local currentTab = "BRIGHT / CLEAN"
+local function renderShaders()
+	for _, child in pairs(Scroll:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
+	local query = SearchInput.Text:lower()
+	
+	local list = {}
+	if currentTab == "FAVORITES" then
+		for _, cat in pairs(SHADER_TABS) do
+			for _, s in pairs(cat) do if table.find(Favorites, s.Name) then table.insert(list, s) end end
+		end
+	else
+		list = SHADER_TABS[currentTab] or {}
+	end
+
+	for _, data in pairs(list) do
+		if query == "" or data.Name:lower():find(query) then
+			local Row = create("Frame", {Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = THEME.Secondary, Parent = Scroll, ZIndex = 14})
+			create("UICorner", {Parent = Row})
+			create("TextLabel", {Text = data.Name, Position = UDim2.new(0, 15, 0, 12), Size = UDim2.new(0.5, 0, 0, 20), TextColor3 = THEME.TextPrimary, Font = THEME.FontBold, TextSize = 16, BackgroundTransparency = 1, TextXAlignment = "Left", Parent = Row, ZIndex = 15})
+			create("TextLabel", {Text = data.Desc, Position = UDim2.new(0, 15, 0, 32), Size = UDim2.new(0.5, 0, 0, 15), TextColor3 = THEME.TextSecondary, Font = THEME.Font, TextSize = 11, BackgroundTransparency = 1, TextXAlignment = "Left", Parent = Row, ZIndex = 15})
+			
+			local Btn = create("TextButton", {Text = "ENABLE", Size = UDim2.new(0, 80, 0, 30), Position = UDim2.new(1, -95, 0.5, -15), BackgroundColor3 = Color3.fromRGB(30, 30, 35), TextColor3 = THEME.Accent, Font = THEME.FontBold, TextSize = 11, Parent = Row, ZIndex = 16})
+			create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = Btn})
+			
+            Btn.MouseButton1Click:Connect(function() 
+				SelTitle.Text = data.Name
+				CleanSpecialShaders() -- Clean up previous effects
+                
+                if data.Set.Type == "Special" then
+                    if data.Set.Mode == "DarkGlow" then
+                        Lighting.Brightness = 0
+                        Lighting.Ambient = Color3.fromRGB(0, 0, 0)
+                        local bloom = Instance.new("BloomEffect", Lighting)
+                        bloom.Name = "RivalsGlow"
+                        bloom.Intensity = 2.5
+                        bloom.Size = 24
+                        bloom.Threshold = 0.05
+                        local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect", Lighting)
+                        cc.Saturation = -0.1
+                        cc.Contrast = 0.6
+                        cc.TintColor = Color3.fromRGB(180, 180, 255)
+                    elseif data.Set.Mode == "Liquid" then
+                        LiquidPart = Instance.new("Part")
+                        LiquidPart.Transparency = 0.98
+                        LiquidPart.Material = Enum.Material.Glass
+                        LiquidPart.CanCollide = false
+                        LiquidPart.Anchored = true
+                        LiquidPart.Size = Vector3.new(10, 10, 10)
+                        LiquidPart.Parent = Camera
+                        LiquidConn = RunService.RenderStepped:Connect(function()
+                            if LiquidPart then
+                                local wobble = CFrame.Angles(math.sin(tick()*2)*0.04, math.cos(tick()*2)*0.04, 0)
+                                LiquidPart.CFrame = Camera.CFrame * CFrame.new(0,0,-1.2) * wobble
+                            end
+                        end)
+                    end
+                else
+                    local ti = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                    local CC = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect", Lighting)
+                    TweenService:Create(Lighting, ti, {ClockTime = data.Set.Time, Brightness = data.Set.Bright}):Play()
+                    TweenService:Create(CC, ti, {Saturation = data.Set.Sat, Contrast = data.Set.Con, TintColor = data.Set.Color}):Play()
+                    local bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect", Lighting)
+                    TweenService:Create(bloom, ti, {Intensity = data.Set.Bloom}):Play()
+                end
+			end)
+
+			local isFav = table.find(Favorites, data.Name)
+			local FavBtn = create("TextButton", {Text = isFav and "★" or "☆", Size = UDim2.new(0, 45, 0, 45), Position = UDim2.new(1, -150, 0.5, -22), BackgroundTransparency = 1, TextColor3 = THEME.Accent, Font = THEME.FontBold, TextSize = 32, Parent = Row, ZIndex = 16})
+			FavBtn.MouseButton1Click:Connect(function()
+				local idx = table.find(Favorites, data.Name)
+				if idx then table.remove(Favorites, idx) FavBtn.Text = "☆" else table.insert(Favorites, data.Name) FavBtn.Text = "★" end
+				SaveFavorites() if currentTab == "FAVORITES" then renderShaders() end
+			end)
+		end
+	end
+	Scroll.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y)
+end
+
+-- // ANIMATION & TOGGLE //
+local currentTween = nil
+local function ToggleMenu()
+	IsMenuOpen = not IsMenuOpen
+	if currentTween then currentTween:Cancel() end 
+
+	if IsMenuOpen then
+		if not HasPlayedSound then
+			OpenSound:Play()
+			HasPlayedSound = true 
+			task.delay(3, function() if OpenSound then OpenSound:Stop() end end)
+		end
+		
+		Main.Visible = true
+		local ti = TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+		currentTween = TweenService:Create(Main, ti, {Size = MenuSize, Position = UDim2.new(0.5, -400, 0.5, -360)})
+		currentTween:Play()
+		TweenService:Create(Corner, ti, {CornerRadius = UDim.new(0, 12)}):Play()
+	else
+		local ti = TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.In)
+		currentTween = TweenService:Create(Main, ti, {Size = UDim2.new(0,0,0,0), Position = UDim2.new(0.5,0,0.5,0)})
+		currentTween:Play() 
+		currentTween.Completed:Connect(function() 
+			if not IsMenuOpen then Main.Visible = false end
+		end)
+	end
+end
+
+-- // INITIALIZATION //
+local tabOrder = {"FAVORITES", "RIVALS", "BRIGHT / CLEAN", "GOLDEN / CINEMATIC", "DAYBREAK / SEASONAL", "ATMOSPHERIC / FOG"}
+for _, tabName in ipairs(tabOrder) do
+	local TabBtn = create("TextButton", {
+		Text = tabName, 
+		Size = UDim2.new(0, (tabName == "FAVORITES" and 100 or (tabName == "RIVALS" and 100 or 140)), 1, 0), 
+		BackgroundColor3 = (tabName == currentTab and Color3.fromRGB(40,40,45) or THEME.Secondary), 
+		TextColor3 = (tabName == currentTab and THEME.Accent or THEME.TextSecondary), 
+		Font = THEME.FontBold, 
+		TextSize = 13, 
+		Parent = TabBar, 
+		ZIndex = 13
+	})
+	create("UICorner", {CornerRadius = UDim.new(0, 6), Parent = TabBtn})
+	TabBtn.MouseButton1Click:Connect(function()
+		for _, b in pairs(TabBar:GetChildren()) do if b:IsA("TextButton") then b.BackgroundColor3, b.TextColor3 = THEME.Secondary, THEME.TextSecondary end end
+		TabBtn.BackgroundColor3, TabBtn.TextColor3, currentTab = Color3.fromRGB(40, 40, 45), THEME.Accent, tabName
+		renderShaders()
+	end)
+end
+
+local function makeDraggable(trigger, target)
+	local dragging, dragStart, startPos
+	trigger.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging, dragStart, startPos = true, input.Position, target.Position end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - dragStart
+			target.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+end
+makeDraggable(Header, Main)
+
+KeybindBtn.MouseButton1Click:Connect(function() if IsBinding then return end IsBinding = true KeybindBtn.Text = "..." end)
+UserInputService.InputBegan:Connect(function(i, p) 
+	if IsBinding and i.UserInputType == Enum.UserInputType.Keyboard then
+		ToggleKey = i.KeyCode KeybindBtn.Text = i.KeyCode.Name IsBinding = false return
+	end
+	if not p and i.KeyCode == ToggleKey then ToggleMenu() end 
+end)
+SearchInput:GetPropertyChangedSignal("Text"):Connect(renderShaders)
+
+-- // START //
+renderShaders()
+Notify("Welcome to Henessy Shaders")
+ToggleMenu()
