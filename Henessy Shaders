@@ -1,6 +1,7 @@
 -- // WHITELIST SYSTEM //
 local WHITELISTED_IDS = {
 	3591795724,-- Replace with your ID
+	10913610349,
 }
 
 local Players = game:GetService("Players")
